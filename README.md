@@ -22,9 +22,9 @@
 
 ## 快速开始（客户端）
 
-1. 把 `mcpcontrol-1.21.1-1.1.0.jar` 放进 `mods/`，启动游戏到主菜单。
-2. 模组会生成 `config/mcpcontrol.json`，并在 `127.0.0.1:25566` 启动端点。
-3. 用 `/mcp url`、`/mcp token` 取得地址与完整 token。
+1. 把 `mcpcontrol-1.21.1-1.1.1.jar` 放进 `mods/`，启动游戏到主菜单。
+2. **一进游戏端点就自动启动**（不需要 `/mcp start`）：地址、端口、token 都写在 `config/mcpcontrol.json` 里。
+3. 模组还会生成 `config/mcpcontrol-client.json`，内容是可直接粘进 AI 客户端的配置（url + Bearer token），改完配置重启游戏即可生效。
 4. AI 侧配置 `http://127.0.0.1:25566/mcp`，Header `Authorization: Bearer <token>`。
 5. 让 AI 按这个顺序开工：
    - `client_state` —— 看是否在主菜单、是否已进世界
@@ -167,7 +167,9 @@ screenshot                        # 再确认一次结果
   "maxPathNodes": 12000,
   "clientControl": true,
   "allowWorldManagement": true,
-  "screenshotMaxWidth": 1280
+  "screenshotMaxWidth": 1280,
+  "publicUrl": "",
+  "writeClientConfig": true
 }
 ```
 
@@ -176,6 +178,8 @@ screenshot                        # 再确认一次结果
 | `clientControl` | 客户端是否注册 27 个界面/世界/截图/按键工具 |
 | `allowWorldManagement` | 是否允许 `world_create` / `world_join` / `world_leave` 驱动菜单 |
 | `screenshotMaxWidth` | 截图最大宽度（160–3840），超出会等比缩小以减小传输体积 |
+| `publicUrl` | 对外公布的完整地址（如 `http://10.0.0.5:25566`）；留空按 `bindAddress:port` 生成。改这个可以不改端口就换公网/内网地址 |
+| `writeClientConfig` | 每次启动时生成 `config/mcpcontrol-client.json`（mcp-remote 配置片段） |
 | `defaultPlayer` | 未绑定时优先控制的玩家名；留空则只有一名在线玩家时自动选择 |
 | `allowCommands` | 关闭后 `run_command` 直接返回错误 |
 | `maxPathNodes` | A* 最大展开节点，越大越能绕远路，但服务器开销更高 |
@@ -232,7 +236,7 @@ export JAVA_HOME=/path/to/jdk-21
 产物：
 
 ```text
-build/libs/mcpcontrol-1.21.1-1.1.0.jar
+build/libs/mcpcontrol-1.21.1-1.1.1.jar
 ```
 
 ModDevGradle 首次构建需要访问 `maven.neoforged.net`（下载 NeoForm 运行时与 Minecraft 依赖）。离线环境可把已有 Gradle 缓存一起带走，或改用可达的 Maven 镜像。
@@ -241,6 +245,7 @@ ModDevGradle 首次构建需要访问 `maven.neoforged.net`（下载 NeoForm 运
 
 | 现象 | 处理 |
 |---|---|
+| 端点没起来 | 确认 `autoStart=true`；客户端模式下第一个 tick 就会启动，日志里搜 `MCP endpoint ready` |
 | `401 unauthorized` | Header 是否为 `Authorization: Bearer <token>`；token 是否被 `/mcp token reset` 改过 |
 | `Unknown MCP session` | 重新 `initialize`，或客户端没有回传 `Mcp-Session-Id` |
 | `This is a dedicated server...` | 客户端工具只在物理客户端安装时可用 |

@@ -32,7 +32,7 @@ import java.io.IOException;
  */
 public final class McpRuntime {
 
-    public static final String VERSION = "1.1.0";
+    public static final String VERSION = "1.1.1";
     private static final Logger LOGGER = LoggerFactory.getLogger("MCP-Control/Runtime");
     private static volatile McpRuntime INSTANCE;
 
@@ -90,7 +90,8 @@ public final class McpRuntime {
         }
     }
 
-    /** Called once on a physical client, at the first client tick. */    public static synchronized void startClient(ClientApi api) {
+    /** Called once on a physical client, at the first client tick. */
+    public static synchronized void startClient(ClientApi api) {
         McpRuntime runtime = ensure();
         runtime.client = api;
         runtime.context.client = api;
@@ -180,7 +181,36 @@ public final class McpRuntime {
                 "mcp-control", VERSION, protocol);
         server.start();
         this.http = server;
-        LOGGER.info("MCP endpoint ready at {}/mcp (token {})", config.url(), config.maskedToken());
+        LOGGER.info("MCP endpoint ready at {} (token {})", config.endpointUrl(), config.maskedToken());
+        if (config.writeClientConfig) {
+            writeClientConfig();
+        }
+    }
+
+    /** Writes a ready-to-paste mcp-remote snippet next to the main config. */
+    private void writeClientConfig() {
+        try {
+            JsonObject root = new JsonObject();
+            JsonObject servers = new JsonObject();
+            JsonObject minecraft = new JsonObject();
+            minecraft.addProperty("command", "npx");
+            com.google.gson.JsonArray args = new com.google.gson.JsonArray();
+            for (String arg : new String[]{"-y", "mcp-remote", config.endpointUrl(),
+                    "--header", "Authorization: Bearer " + config.token}) {
+                args.add(arg);
+            }
+            minecraft.add("args", args);
+            servers.add("minecraft", minecraft);
+            root.add("mcpServers", servers);
+            java.nio.file.Path path = McpConfig.path().resolveSibling("mcpcontrol-client.json");
+            java.nio.file.Files.createDirectories(path.getParent());
+            java.nio.file.Files.writeString(path,
+                    com.xuanfei.mcpcontrol.mcp.JsonUtil.PRETTY.toJson(root),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            LOGGER.info("Client config written to {}", path);
+        } catch (Throwable throwable) {
+            LOGGER.warn("Could not write the client config: {}", throwable.getMessage());
+        }
     }
 
     public synchronized void stopServices() {
@@ -229,8 +259,11 @@ public final class McpRuntime {
         JsonObject object = new JsonObject();
         object.addProperty("version", VERSION);
         object.addProperty("http_running", http != null && http.isRunning());
-        object.addProperty("url", config.url() + "/mcp");
-        object.addProperty("sse_url", config.url() + "/sse");
+        object.addProperty("url", config.endpointUrl());
+        object.addProperty("sse_url", config.sseUrl());
+        object.addProperty("public_url", config.publicUrl == null || config.publicUrl.isBlank() ? "" : config.publicUrl);
+        object.addProperty("client_config",
+                McpConfig.path().resolveSibling("mcpcontrol-client.json").toString());
         object.addProperty("bind_address", config.bindAddress);
         object.addProperty("port", http == null ? config.port : http.getPort());
         object.addProperty("token_masked", config.maskedToken());

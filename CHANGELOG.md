@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.1 — 2026-11-26
+
+配置化连接信息，进游戏即连。
+
+### Added
+
+- `publicUrl`：对外公布的完整 MCP 地址，留空按 `bindAddress`+`port` 生成；改它就能在不改端口的情况下换内网/公网地址。
+- `writeClientConfig`：每次启动生成 `config/mcpcontrol-client.json`，内含可直接粘到 AI 客户端的 `mcpServers` 片段（url + Bearer token）。
+- `status` 增加 `public_url`、`client_config` 字段；日志启动行直接打印可用的 MCP 地址。
+
+### Changed
+
+- `/mcp url`、`/mcp start`、`/mcp restart` 使用配置里的完整地址。
+- `McpRuntime.VERSION` / `mod_version` 升到 1.1.1。
+
+### Notes
+
+- 物理客户端在第一个客户端 tick 就会启动端点（主菜单即可连接），无需 `/mcp start`；地址、端口、token 全部写在 `config/mcpcontrol.json`。
+
 ## 1.1.0 — 2026-11-26
 
 客户端控制版本：同一个 jar 装在物理客户端后，AI 能像玩家一样操作游戏窗口；装在专用服务器时行为与 1.0.0 完全一致。

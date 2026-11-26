@@ -55,7 +55,7 @@ public final class McpCommand {
         }
         try {
             runtime.startHttp();
-            source.sendSuccess(() -> Component.literal("MCP HTTP server started at " + runtime.config().url() + "/mcp"), false);
+            source.sendSuccess(() -> Component.literal("MCP HTTP server started at " + runtime.config().endpointUrl()), false);
             return 1;
         } catch (IOException error) {
             source.sendFailure(Component.literal("Could not start MCP HTTP server: " + error.getMessage()));
@@ -82,7 +82,7 @@ public final class McpCommand {
         }
         try {
             runtime.restartHttp();
-            source.sendSuccess(() -> Component.literal("MCP HTTP server restarted at " + runtime.config().url() + "/mcp"), false);
+            source.sendSuccess(() -> Component.literal("MCP HTTP server restarted at " + runtime.config().endpointUrl()), false);
             return 1;
         } catch (IOException error) {
             source.sendFailure(Component.literal("Could not restart MCP HTTP server: " + error.getMessage()));
@@ -96,8 +96,8 @@ public final class McpCommand {
             source.sendFailure(Component.literal("MCP runtime is not started."));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal("Streamable HTTP: " + runtime.config().url() + "/mcp\n"
-                + "Legacy SSE: " + runtime.config().url() + "/sse\n"
+        source.sendSuccess(() -> Component.literal("Streamable HTTP: " + runtime.config().endpointUrl() + "\n"
+                + "Legacy SSE: " + runtime.config().sseUrl() + "\n"
                 + "Token: " + runtime.config().maskedToken() + " (use /mcp token for the full value)"), false);
         return 1;
     }

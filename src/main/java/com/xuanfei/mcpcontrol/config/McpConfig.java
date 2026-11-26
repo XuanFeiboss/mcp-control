@@ -35,6 +35,14 @@ public final class McpConfig {
     public double sprintSpeed = 0.30;
     public int maxPathNodes = 12000;
 
+    /**
+     * Full URL advertised to the AI client, e.g. {@code http://127.0.0.1:25566/mcp}.
+     * Leave empty to derive it from {@code bindAddress} + {@code port} + {@code /mcp}.
+     */
+    public String publicUrl = "";
+    /** Write {@code config/mcpcontrol-client.json} (a ready-to-paste mcp-remote snippet) on every start. */
+    public boolean writeClientConfig = true;
+
     /** Client-side (physical client only): register screen/world/screenshot tools. */
     public boolean clientControl = true;
     /** Client-side: allow world_create / world_join / world_leave to drive the menus. */
@@ -78,6 +86,16 @@ public final class McpConfig {
         this.walkSpeed = clamp(this.walkSpeed, 0.05, 0.45);
         this.sprintSpeed = clamp(this.sprintSpeed, 0.05, 0.55);
         this.maxPathNodes = Math.max(1000, Math.min(40000, this.maxPathNodes));
+        if (this.publicUrl == null) {
+            this.publicUrl = "";
+        }
+        this.publicUrl = this.publicUrl.trim();
+        if (!this.publicUrl.isEmpty() && !this.publicUrl.startsWith("http://") && !this.publicUrl.startsWith("https://")) {
+            this.publicUrl = "http://" + this.publicUrl;
+        }
+        while (this.publicUrl.endsWith("/")) {
+            this.publicUrl = this.publicUrl.substring(0, this.publicUrl.length() - 1);
+        }
         this.screenshotMaxWidth = Math.max(160, Math.min(3840, this.screenshotMaxWidth));
     }
 
@@ -104,6 +122,24 @@ public final class McpConfig {
             host = "127.0.0.1";
         }
         return "http://" + host + ":" + port;
+    }
+
+    /** The Streamable HTTP endpoint the AI should connect to (always ends with {@code /mcp}). */
+    public String endpointUrl() {
+        String advertised = this.publicUrl;
+        if (advertised == null || advertised.isBlank()) {
+            return url() + "/mcp";
+        }
+        if (advertised.endsWith("/mcp")) {
+            return advertised;
+        }
+        return advertised + "/mcp";
+    }
+
+    /** The legacy SSE endpoint (base URL + {@code /sse}). */
+    public String sseUrl() {
+        String endpoint = endpointUrl();
+        return endpoint.substring(0, endpoint.length() - "/mcp".length()) + "/sse";
     }
 
     public String maskedToken() {
