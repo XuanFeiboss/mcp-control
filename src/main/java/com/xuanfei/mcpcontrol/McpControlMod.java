@@ -35,7 +35,7 @@ public final class McpControlMod {
     }
 
     private void onServerStopping(ServerStoppingEvent event) {
-        McpRuntime.stop();
+        McpRuntime.serverStopping(event.getServer());
     }
 
     private void onServerTick(ServerTickEvent.Post event) {

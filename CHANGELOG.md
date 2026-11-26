@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.1.0 — 2026-11-26
+
+客户端控制版本：同一个 jar 装在物理客户端后，AI 能像玩家一样操作游戏窗口；装在专用服务器时行为与 1.0.0 完全一致。
+
+### Added — 客户端（27 个新工具）
+
+- **世界生命周期**：`world_create`（走真实菜单创建并进入单人世界，支持名字/种子/游戏模式/地形）、`world_join`（按名字或序号载入存档）、`world_leave`（保存并退回主菜单）、`game_pause`、`game_respawn`。
+- **界面交互**：`screen_state` 列出当前界面全部控件（序号/类型/文字/翻译键/输入值/坐标/启用状态）、`screen_click`（按序号或中英文文字真实点击控件）、`screen_click_xy`、`screen_set_text`、`screen_key`、`screen_close`。
+- **截图**：`screenshot` 把帧缓冲转 PNG 并以 MCP `image` 内容块内联返回，可按 `include_gui` 选择含界面或纯世界画面，并按 `max_width` 等比缩小。
+- **真实输入**：`client_input`（`KeyMapping#setDown` 按住 WASD/跳/潜行/疾跑 N tick）、`client_look`、`client_mine`（`startDestroyBlock`/`continueDestroyBlock` 持续挖掘）、`client_place`（`useItemOn`）、`client_use`、`client_attack`、`client_interact`、`client_select_hotbar`、`client_wait`。
+- **容器**：`container_state`（槽位/光标物品/快捷栏）、`container_click`（`handleInventoryMouseClick` 支持拾取/Shift 快速移动/丢弃/交换/拖拽/双击）、`container_close`。
+- 客户端端点随**第一个客户端 tick**启动并跨世界存活，因此 AI 可在主菜单连接；进世界后 39 个服务端工具通过内置服务端自动可用。
+- 界面成员通过 `Ref` 反射按名查找，映射差异时返回可读错误而不是崩溃。
+
+### Changed
+
+- `ToolResult` 支持内联图片内容块（`ImageBlock`）。
+- `ToolContext` 的 `server` 改为可空：客户端在主菜单时服务端工具返回明确错误，而不是抛出空指针。
+- `McpRuntime` 改为双端生命周期：专用服随服务器启动/停止；物理客户端长期存活，仅在世界切换时 attach/detach 集成服务器。
+- 新增配置 `clientControl`、`allowWorldManagement`、`screenshotMaxWidth`。
+- `initialize` 的 instructions 重写为“客户端工具组 + 玩家工具组 + 典型启动流程”。
+
+### Fixed
+
+- 退回主菜单时不再关闭客户端端点（旧逻辑会把端点一起停掉）。
+
+### Tool count
+
+- 服务端 39 + 客户端 27 = 66。
+
+### Known limitations
+
+- 界面按钮靠显示文字/翻译键匹配（内置中英文关键词），魔改界面需 `screen_state` + `screen_click_xy` 兜底。
+- 世界创建/载入按原版 `CreateWorldScreen` / `SelectWorldScreen` 布局推进。
+- 专用服务器没有画面与菜单，只有 39 个服务端工具。
+- 已用 1.21.1 官方映射类全量编译通过（0 错误），但本环境无图形客户端，未做真机启动验证。
+
 ## 1.0.0 — 2026-11-26
 
 首个可运行版本。

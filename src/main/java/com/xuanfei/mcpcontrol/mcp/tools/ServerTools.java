@@ -118,13 +118,15 @@ public final class ServerTools {
                 ToolSchemas.schema(new JsonObject()), true, false) {
             @Override
             public CompletableFuture<ToolResult> call(JsonObject arguments, ToolContext context) {
-                return context.onServer(() -> {
-                    McpRuntime runtime = McpRuntime.get();
-                    if (runtime == null) {
-                        return ToolResult.error("The MCP runtime is not started.");
-                    }
-                    return ToolResult.ok("MCP status", runtime.status());
-                });
+                McpRuntime runtime = McpRuntime.get();
+                if (runtime == null) {
+                    return CompletableFuture.completedFuture(ToolResult.error("The MCP runtime is not started."));
+                }
+                if (context.server == null) {
+                    // Client before a world is loaded: the status is still readable, just without server data.
+                    return CompletableFuture.completedFuture(ToolResult.ok("MCP status", runtime.status()));
+                }
+                return context.onServer(() -> ToolResult.ok("MCP status", runtime.status()));
             }
         });
     }

@@ -92,11 +92,17 @@ public final class McpProtocol implements McpHttpServer.Backend {
         info.addProperty("version", serverVersion);
         result.add("serverInfo", info);
         result.addProperty("instructions",
-                "This server controls a real Minecraft player through the game client/server. "
-                        + "Start with get_player_state and get_nearby_entities to observe the world, then use move_to, "
-                        + "mine_block, place_block, attack_entity, use_item, craft_item and container tools to act. "
-                        + "Actions that take time block until they finish or time out. Call stop_task to interrupt. "
-                        + "All coordinates are world block coordinates; the player is whoever is bound in-game.");
+                "This server controls a real Minecraft game. Two groups of tools exist. "
+                        + "(1) Client tools (prefix client_, screen_, world_, container_, screenshot) drive the actual game window: "
+                        + "navigate menus, create/join/leave a single-player world, click GUI widgets, take screenshots, hold "
+                        + "movement keys, mine/place/use/attack, and click container slots. They are only available when the mod "
+                        + "runs on the game client. "
+                        + "(2) Player tools (get_player_state, move_to, mine_block, place_block, craft_item, get_inventory, chat, "
+                        + "run_command, ...) act on the real server-side player and are available once a world is loaded. "
+                        + "Typical start: client_state -> screenshot -> (if at the title screen) world_create or world_join -> "
+                        + "screen_state/screen_click for menus -> container_state/container_click for chests and crafting -> "
+                        + "get_player_state before long actions. Every action blocks until it finishes or times out; call "
+                        + "stop_task or send a new request to interrupt. Coordinates are world block coordinates.");
         return result;
     }
 
@@ -138,7 +144,9 @@ public final class McpProtocol implements McpHttpServer.Backend {
             ToolResult result = future.get(5, TimeUnit.MINUTES);
             return result.toJson();
         } catch (TimeoutException timeout) {
-            context.server.execute(() -> context.tasks.stop("MCP protocol timeout"));
+            if (context.server != null) {
+                context.server.execute(() -> context.tasks.stop("MCP protocol timeout"));
+            }
             return ToolResult.error("Tool timed out after 5 minutes and the action was stopped.").toJson();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();

@@ -35,6 +35,13 @@ public final class McpConfig {
     public double sprintSpeed = 0.30;
     public int maxPathNodes = 12000;
 
+    /** Client-side (physical client only): register screen/world/screenshot tools. */
+    public boolean clientControl = true;
+    /** Client-side: allow world_create / world_join / world_leave to drive the menus. */
+    public boolean allowWorldManagement = true;
+    /** Client-side: maximum screenshot width in pixels (larger frames are downscaled). */
+    public int screenshotMaxWidth = 1280;
+
     public static McpConfig load() {
         Path path = path();
         McpConfig config = new McpConfig();
@@ -71,6 +78,7 @@ public final class McpConfig {
         this.walkSpeed = clamp(this.walkSpeed, 0.05, 0.45);
         this.sprintSpeed = clamp(this.sprintSpeed, 0.05, 0.55);
         this.maxPathNodes = Math.max(1000, Math.min(40000, this.maxPathNodes));
+        this.screenshotMaxWidth = Math.max(160, Math.min(3840, this.screenshotMaxWidth));
     }
 
     public void resetToken() {

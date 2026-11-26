@@ -1,5 +1,6 @@
 package com.xuanfei.mcpcontrol.mcp;
 
+import com.xuanfei.mcpcontrol.client.ClientApi;
 import com.xuanfei.mcpcontrol.config.McpConfig;
 import com.xuanfei.mcpcontrol.game.ActionTask;
 import com.xuanfei.mcpcontrol.game.PlayerBridge;
@@ -14,30 +15,60 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 
-/** Per-call context handed to tools: server, config, player binding and task scheduler. */
+/**
+ * Per-call context handed to tools. On a dedicated server {@link #server} is always present;
+ * on a physical client it is only attached once a world (and therefore the integrated server) is running,
+ * which lets the AI work from the main menu (create/join a world, click screens, take screenshots).
+ */
 public final class ToolContext {
 
-    public final MinecraftServer server;
+    /** Mutable because the client attaches/detaches the integrated server while the HTTP endpoint keeps running. */
+    public volatile MinecraftServer server;
+    /** Non-null only on a physical client. */
+    public volatile ClientApi client;
     public final McpConfig config;
     public final PlayerBridge players;
     public final TaskManager tasks;
 
-    public ToolContext(MinecraftServer server, McpConfig config, PlayerBridge players, TaskManager tasks) {
+    public ToolContext(MinecraftServer server, ClientApi client, McpConfig config,
+                       PlayerBridge players, TaskManager tasks) {
         this.server = server;
+        this.client = client;
         this.config = config;
         this.players = players;
         this.tasks = tasks;
     }
 
+    public boolean hasServer() {
+        return server != null;
+    }
+
+    public ClientApi client() {
+        if (client == null) {
+            throw new ToolError("This is a dedicated server: there is no game client, so screen/world/GUI tools are unavailable. "
+                    + "Install the mod on the client to use them.");
+        }
+        return client;
+    }
+
     /** Resolves the player currently under AI control. */
     public ServerPlayer player() {
+        if (server == null) {
+            throw new ToolError("No world is loaded. Create or join a single-player world first "
+                    + "(world_create or world_join), then retry.");
+        }
         return players.resolve(server, config);
     }
 
     /** Runs a supplier on the server thread. */
     public <T> CompletableFuture<T> onServer(Supplier<T> supplier) {
+        if (server == null) {
+            throw new ToolError("No world is loaded, so there is no server thread to run this action on. "
+                    + "Create or join a world first.");
+        }
+        MinecraftServer active = server;
         CompletableFuture<T> future = new CompletableFuture<>();
-        server.execute(() -> {
+        active.execute(() -> {
             try {
                 future.complete(supplier.get());
             } catch (Throwable throwable) {
@@ -98,6 +129,9 @@ public final class ToolContext {
     }
 
     private void stopOnServer(String reason) {
-        server.execute(() -> tasks.stop(reason));
+        MinecraftServer active = server;
+        if (active != null) {
+            active.execute(() -> tasks.stop(reason));
+        }
     }
 }
