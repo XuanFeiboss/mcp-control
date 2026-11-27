@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0 — 2026-11-27
+
+补上"退出游戏"和截图落盘。
+
+### Added
+
+- `game_quit`（客户端）：先保存存档并回标题界面，再延迟关闭整个游戏进程；延迟是为了让本次工具回复先送达。
+- `screenshot` 新增 `save` / `path`：除了返回内联 PNG，还能把图写进游戏目录（默认 `screenshots/mcp/mcp-<时间戳>.png`）。
+
+### Changed
+
+- 工具总数 66 → 67（客户端 28）。
+- `McpRuntime.VERSION` / `mod_version` 升到 1.2.0。
+- 构建说明：javac 的 classpath 必须把 `mc.jar`（官方映射）放在 `client.jar` 之前，否则 `MinecraftServer#getPlayerList` 会被遮住。
+
 ## 1.1.1 — 2026-11-26
 
 配置化连接信息，进游戏即连。

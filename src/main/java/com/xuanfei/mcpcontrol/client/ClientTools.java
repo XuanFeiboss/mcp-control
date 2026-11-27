@@ -8,11 +8,17 @@ import com.xuanfei.mcpcontrol.mcp.ToolError;
 import com.xuanfei.mcpcontrol.mcp.ToolRegistry;
 import com.xuanfei.mcpcontrol.mcp.ToolResult;
 import com.xuanfei.mcpcontrol.mcp.ToolSchemas;
+import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.Vec3;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -296,6 +302,38 @@ public final class ClientTools {
             }
         });
 
+        registry.register(new BaseTool("game_quit", "Quit the game",
+                "Saves the current single-player world, returns to the title screen, then shuts the whole game "
+                        + "process down after a short delay so this reply is delivered. The MCP endpoint dies with "
+                        + "the process; use world_leave if you only want to reach the main menu.",
+                quitSchema(), false, true) {
+            @Override
+            public CompletableFuture<ToolResult> call(JsonObject arguments, ToolContext context) {
+                JsonObject copy = arguments.deepCopy();
+                boolean save = JsonUtil.optionalBoolean(copy, "save", true);
+                double delay = JsonUtil.optionalDouble(copy, "delay_seconds", 3.0, 0.5, 30.0);
+                boolean atTitle = bridge.minecraft().level == null;
+                CompletableFuture<ToolResult> leave = (!save || atTitle)
+                        ? CompletableFuture.completedFuture(ToolResult.ok("No world to save."))
+                        : bridge.runAsync(bridge.worlds().leaveTask(true), 90);
+                return leave.handle((result, throwable) -> {
+                    JsonObject data = new JsonObject();
+                    data.addProperty("save_requested", save);
+                    data.addProperty("was_in_world", !atTitle);
+                    data.addProperty("quit_in_seconds", delay);
+                    if (throwable != null) {
+                        data.addProperty("save_error", throwable.getMessage() == null
+                                ? throwable.getClass().getSimpleName() : throwable.getMessage());
+                    } else if (result != null) {
+                        data.addProperty("save_result", result.text());
+                    }
+                    scheduleQuit(bridge.minecraft(), delay);
+                    return ToolResult.ok("Quitting the game in about " + JsonUtil.round(delay)
+                            + "s. The MCP endpoint will go down with it.", data);
+                });
+            }
+        });
+
         registry.register(new BaseTool("game_pause", "Open the pause menu",
                 "Opens the vanilla pause menu (the same as pressing ESC in a world).",
                 ToolSchemas.schema(new JsonObject()), false, false) {
@@ -322,6 +360,8 @@ public final class ClientTools {
             public CompletableFuture<ToolResult> call(JsonObject arguments, ToolContext context) {
                 JsonObject copy = arguments.deepCopy();
                 boolean includeGui = JsonUtil.optionalBoolean(copy, "include_gui", true);
+                boolean save = JsonUtil.optionalBoolean(copy, "save", false);
+                String path = JsonUtil.optionalString(copy, "path", "");
                 int configured = context.config.screenshotMaxWidth;
                 int maxWidth = JsonUtil.optionalInt(copy, "max_width", configured, 160, 3840);
                 return CompletableFuture.supplyAsync(() -> {
@@ -333,9 +373,16 @@ public final class ClientTools {
                         data.addProperty("base64_length", base64.length());
                         data.addProperty("include_gui", includeGui);
                         data.addProperty("max_width", maxWidth);
+                        File written = null;
+                        if (save) {
+                            written = saveToDisk(bridge.minecraft().gameDirectory, path, png);
+                            data.addProperty("saved_to", written.getAbsolutePath());
+                        }
                         List<ToolResult.ImageBlock> images = new ArrayList<>();
                         images.add(new ToolResult.ImageBlock("image/png", base64));
-                        return ToolResult.image("Screenshot captured (" + png.length + " bytes).", data, images);
+                        String caption = "Screenshot captured (" + png.length + " bytes)."
+                                + (written == null ? "" : " Saved to " + written.getAbsolutePath());
+                        return ToolResult.image(caption, data, images);
                     } catch (Throwable throwable) {
                         String message = throwable.getMessage() == null
                                 ? throwable.getClass().getSimpleName()
@@ -660,6 +707,9 @@ public final class ClientTools {
         JsonObject properties = new JsonObject();
         properties.add("include_gui", ToolSchemas.bool("Include HUD and open menus (default true)"));
         properties.add("max_width", ToolSchemas.integer("Downscale to this width in pixels (default 1280)", 160, 3840));
+        properties.add("save", ToolSchemas.bool("Also write the PNG into the game directory (default false)"));
+        properties.add("path", ToolSchemas.string("Relative .png file or folder used when save=true, "
+                + "e.g. screenshots/mcp/house.png"));
         return ToolSchemas.schema(properties);
     }
 
@@ -742,7 +792,78 @@ public final class ClientTools {
         return ToolSchemas.schema(properties, "slot");
     }
 
+    private static JsonObject quitSchema() {
+        JsonObject properties = new JsonObject();
+        properties.add("save", ToolSchemas.bool("Save the world and return to the title screen first (default true)"));
+        properties.add("delay_seconds", ToolSchemas.number("Grace period before the process shuts down", 0.5, 30));
+        return ToolSchemas.schema(properties);
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    /** Resolves the destination for screenshot save=true and writes the PNG. */
+    private static File saveToDisk(File gameDirectory, String requestedPath, byte[] png) throws IOException {
+        String name = requestedPath == null ? "" : requestedPath.trim();
+        if (name.isEmpty()) {
+            name = defaultShotPath();
+        } else if (!name.toLowerCase(Locale.ROOT).endsWith(".png")) {
+            name = (name.endsWith("/") || name.endsWith("\\") ? name : name + "/") + defaultShotName();
+        }
+        File target = new File(name);
+        if (!target.isAbsolute()) {
+            target = new File(gameDirectory, name);
+        }
+        File parent = target.getParentFile();
+        if (parent != null) {
+            Files.createDirectories(parent.toPath());
+        }
+        Files.write(target.toPath(), png);
+        return target;
+    }
+
+    private static String defaultShotPath() {
+        return "screenshots/mcp/" + defaultShotName();
+    }
+
+    private static String defaultShotName() {
+        return "mcp-" + DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").format(LocalDateTime.now()) + ".png";
+    }
+
+    /** Schedules the actual shutdown on a background thread so the tool reply reaches the client first. */
+    private static void scheduleQuit(Minecraft minecraft, double seconds) {
+        Thread thread = new Thread(() -> {
+            try {
+                Thread.sleep((long) (seconds * 1000L));
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            try {
+                minecraft.execute(() -> stopGame(minecraft));
+            } catch (Throwable throwable) {
+                stopGame(minecraft);
+            }
+        }, "MCP-Control/Quit");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private static void stopGame(Minecraft minecraft) {
+        try {
+            minecraft.stop();
+        } catch (Throwable ignored) {
+            // the watchdog below still terminates the process
+        }
+        Thread watchdog = new Thread(() -> {
+            try {
+                Thread.sleep(15_000L);
+            } catch (InterruptedException interrupted) {
+                return;
+            }
+            System.exit(0);
+        }, "MCP-Control/Quit-Watchdog");
+        watchdog.setDaemon(true);
+        watchdog.start();
+    }
 
     private static ScreenDriver.Widget findByIndex(ClientBridge bridge, int index) {
         List<ScreenDriver.Widget> widgets = bridge.screens().widgets(bridge.screens().screen());

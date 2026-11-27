@@ -8,7 +8,7 @@
 
 | 部署 | 能做什么 | 说明 |
 |---|---|---|
-| **物理客户端**（推荐） | 全部 66 个工具：创建世界、操作菜单、截图、真实按键、服务端玩家动作 | 装在整合包/启动器的 `mods` 里，单人世界即可 |
+| **物理客户端**（推荐） | 全部 67 个工具：创建世界、操作菜单、截图、真实按键、服务端玩家动作 | 装在整合包/启动器的 `mods` 里，单人世界即可 |
 | **专用服务器** | 39 个服务端玩家工具 | 不需要客户端装模组，控制真实在线玩家 |
 
 客户端模式是 1.1.0 新增的能力：MCP 端点在**客户端第一个 tick**启动并一直存活（不随世界加载重启），所以 AI 在**主菜单**就能连上，`world_create` / `world_join` 进世界后，服务端的 39 个玩家工具会自动通过内置服务端可用。
@@ -85,9 +85,9 @@ curl -s -D - http://127.0.0.1:25566/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}'
 ```
 
-## 工具清单（66 个）
+## 工具清单（67 个）
 
-### 客户端与界面（27 个，仅物理客户端）
+### 客户端与界面（28 个，仅物理客户端）
 
 | 工具 | 作用 |
 |---|---|
@@ -101,9 +101,10 @@ curl -s -D - http://127.0.0.1:25566/mcp \
 | `world_create` | 走真实菜单创建并进入单人世界：标题 → 单人 → 创建新的世界 → 填名字/种子/模式/地形 → 创建 |
 | `world_join` | 回标题界面并载入指定名字（或序号）的存档 |
 | `world_leave` | 打开暂停菜单点「保存并退出」，回到主菜单 |
+| `game_quit` | 保存存档并回标题，然后把整个游戏进程关掉；端点随进程消失，只想回主菜单用 `world_leave` |
 | `game_pause` | 打开原版暂停菜单 |
 | `game_respawn` | 死亡界面点「重生」 |
-| `screenshot` | 截图并作为内联 PNG 图片返回；`include_gui=true` 含 HUD 与界面，`false` 只有世界画面 |
+| `screenshot` | 截图并作为内联 PNG 图片返回；`include_gui=true` 含 HUD 与界面，`false` 只有世界画面；`save=true` 同时把 PNG 写进游戏目录（`path` 可指定文件或目录） |
 | `client_input` | 按住移动键 N tick（WASD/跳/潜行/疾跑），可 `release` 松手 |
 | `client_look` | 设定朝向：绝对 yaw/pitch、相对增量，或看向某个坐标 |
 | `client_mine` | 用真实左键挖掘：先瞄准，再持续按住直到方块破碎（硬度/工具/保护照常生效） |
@@ -135,7 +136,7 @@ curl -s -D - http://127.0.0.1:25566/mcp \
 
 ```text
 client_state                      # 在主菜单？已进世界？
-screenshot                        # 看画面（内联 PNG）
+screenshot                        # 看画面（内联 PNG）；save=true 可落盘
 screen_state                      # 标题界面有哪些按钮
 world_create {name:"AutoWorld", game_mode:"creative", seed:"12345"}
 client_wait {seconds:2}           # 等世界加载
@@ -146,7 +147,7 @@ client_interact {x:11,y:64,z:-3}  # 打开箱子
 container_state
 container_click {slot:27, click_type:"quick_move"}
 container_close
-screenshot                        # 再确认一次结果
+screenshot {save:true}            # 再确认一次结果，并存一张 PNG
 ```
 
 ## 配置
@@ -175,7 +176,7 @@ screenshot                        # 再确认一次结果
 
 | 键 | 说明 |
 |---|---|
-| `clientControl` | 客户端是否注册 27 个界面/世界/截图/按键工具 |
+| `clientControl` | 客户端是否注册 28 个界面/世界/截图/按键工具 |
 | `allowWorldManagement` | 是否允许 `world_create` / `world_join` / `world_leave` 驱动菜单 |
 | `screenshotMaxWidth` | 截图最大宽度（160–3840），超出会等比缩小以减小传输体积 |
 | `publicUrl` | 对外公布的完整地址（如 `http://10.0.0.5:25566`）；留空按 `bindAddress:port` 生成。改这个可以不改端口就换公网/内网地址 |
@@ -194,9 +195,9 @@ McpHttpServer（纯 java.base socket，无 com.sun.net.httpserver）
    ▼
 McpProtocol（initialize / tools/list / tools/call）
    ▼
-ToolRegistry（66 个工具）
+ToolRegistry（67 个工具）
    ├── 服务端工具 39 个 → ToolContext → TaskManager（ServerTickEvent 驱动）→ 真实 ServerPlayer
-   └── 客户端工具 27 个 → ClientBridge → ClientTaskManager（ClientTickEvent 驱动）
+   └── 客户端工具 28 个 → ClientBridge → ClientTaskManager（ClientTickEvent 驱动）
                           ├── WorldDriver   标题/选档/建世界/暂停/重生 状态机
                           ├── ScreenDriver  Screen#children + GuiEventListener 真实点击
                           ├── InputDriver   KeyMapping#setDown 真实按键

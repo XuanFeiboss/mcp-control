@@ -32,7 +32,7 @@ import java.io.IOException;
  */
 public final class McpRuntime {
 
-    public static final String VERSION = "1.1.1";
+    public static final String VERSION = "1.2.0";
     private static final Logger LOGGER = LoggerFactory.getLogger("MCP-Control/Runtime");
     private static volatile McpRuntime INSTANCE;
 
